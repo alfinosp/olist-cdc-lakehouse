@@ -1,4 +1,4 @@
-FROM apache/airflow:3.3.1-python3.12
+FROM apache/airflow:3.3.2-python3.12
 
 # Project code (ingestion, dbt) runs from its own virtualenv so its dependencies
 # never clash with Airflow's pinned constraints.
