@@ -19,7 +19,7 @@ COMPOSE_CDC := docker compose -f docker-compose.yml -f docker-compose.cdc.yml
         cdc-up cdc-register cdc-status cdc-logs cdc-down cdc-reset
 
 help:  ## List targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 venv:  ## Create .venv and install the project with dev tools
 	python3 -m venv $(VENV)
