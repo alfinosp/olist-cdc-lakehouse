@@ -1,0 +1,10 @@
+snapshots:
+  - name: snap_orders
+    description: SCD Type 2 history of every order's status and timestamps.
+    relation: ref('stg_orders')
+    config:
+      schema: snapshots
+      unique_key: order_id
+      strategy: timestamp
+      updated_at: source_updated_at
+      hard_deletes: invalidate
