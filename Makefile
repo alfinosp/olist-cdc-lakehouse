@@ -68,10 +68,14 @@ lint:  ## Ruff lint
 ci-local:  ## Run what CI runs, on fixture data (does not touch data/lake)
 	$(VENV)/bin/ruff check .
 	$(PY) -m pytest
-	$(PY) scripts/make_fixture_bronze.py
 	mkdir -p data/ci
-	cd dbt/olist && $(DBT) deps --quiet && LAKE_ROOT=$(CURDIR)/data/ci/lake WAREHOUSE_PATH=$(CURDIR)/data/ci/ci.duckdb \
-		$(DBT) build --target ci
+	cd dbt/olist && $(DBT) deps --quiet
+	for via in batch cdc; do \
+		lake=$(CURDIR)/data/ci/lake$$([ $$via = cdc ] && echo -cdc); \
+		$(PY) scripts/make_fixture_bronze.py --via $$via && \
+		(cd dbt/olist && LAKE_ROOT=$$lake WAREHOUSE_PATH=$(CURDIR)/data/ci/$$via.duckdb $(DBT) build --target ci) \
+		|| exit 1; \
+	done
 
 airflow-up:  ## Build and start Airflow on http://localhost:8080
 	docker compose up -d --build airflow
