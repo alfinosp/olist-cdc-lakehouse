@@ -33,5 +33,59 @@ services:
       retries: 20
     mem_limit: 1g
 
+  airflow:
+    build: ./infra/airflow
+    image: olist-airflow:local
+    # Run as your WSL user so files written to ./data and ./dbt stay yours.
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: standalone
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER:-olist}:${PG_PASSWORD:-olist}@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/airflow/dags
+      AIRFLOW__CORE__PLUGINS_FOLDER: /opt/project/airflow/plugins
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"  # local only: no login screen
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_DB: ${PG_DB:-olist}
+      PG_USER: ${PG_USER:-olist}
+      PG_PASSWORD: ${PG_PASSWORD:-olist}
+      LAKE_ROOT: /opt/project/data/lake
+      WAREHOUSE_PATH: /opt/project/data/warehouse/olist.duckdb
+      DBT_PROFILES_DIR: /opt/project/dbt/olist
+      DBT_TARGET_DIR: /opt/project/dbt/olist/target
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      INGESTION_MODE: ${INGESTION_MODE:-batch}  # batch | cdc: which DAG is scheduled
+    volumes:
+      - ./:/opt/project
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 3g
+
+  # Continuous application traffic. Start with: docker compose --profile sim up -d simulator
+  simulator:
+    image: olist-airflow:local
+    profiles: ["sim"]
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/opt/project-venv/bin/python", "-m", "olist.simulator"]
+    command: ["--events-per-minute", "30", "--bad-rate", "${SIM_BAD_RATE:-0}"]
+    environment:
+      PYTHONPATH: /opt/project/src
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_DB: ${PG_DB:-olist}
+      PG_USER: ${PG_USER:-olist}
+      PG_PASSWORD: ${PG_PASSWORD:-olist}
+    volumes:
+      - ./:/opt/project
+    mem_limit: 256m
+
 volumes:
   pgdata:
