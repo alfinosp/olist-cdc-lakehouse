@@ -1,0 +1,8 @@
+# Spark streaming image. Bronze writer versions match infra/airflow/requirements.txt.
+pyspark==3.5.3
+psycopg[binary]==3.3.8
+polars==1.44.2
+pyarrow==26.0.1
+deltalake==1.6.6
+python-dotenv>=1.0
+requests>=2.32
