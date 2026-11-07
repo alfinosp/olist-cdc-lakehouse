@@ -1,0 +1,40 @@
+name: olist
+version: "1.0.0"
+profile: olist
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+snapshot-paths: ["snapshots"]
+target-path: target
+clean-targets: [target, dbt_packages]
+
+vars:
+  quarantine_error_ratio: 0.01   # > 1% of a Silver table quarantined = pipeline stops
+  reconciliation_tolerance: 0.005
+
+models:
+  olist:
+    silver:
+      +schema: silver
+      +materialized: incremental
+      +incremental_strategy: delete+insert
+      +unique_key: _pk
+    quarantine:
+      +schema: quarantine
+      +materialized: view
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: table
+
+data_tests:
+  olist:
+    +store_failures: true
+    +schema: dq_failures
+
+on-run-end:
+  - "{{ create_dq_audit_log() }}"
+  - "{{ log_dq_results(results) }}"
