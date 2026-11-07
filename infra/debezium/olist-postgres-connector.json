@@ -1,0 +1,36 @@
+{
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "tasks.max": "1",
+  "plugin.name": "pgoutput",
+
+  "database.hostname": "postgres",
+  "database.port": "5432",
+  "database.user": "${PG_USER}",
+  "database.password": "${PG_PASSWORD}",
+  "database.dbname": "${PG_DB}",
+
+  "topic.prefix": "olist",
+  "table.include.list": "olist_app.customers,olist_app.sellers,olist_app.products,olist_app.product_category_name_translation,olist_app.orders,olist_app.order_items,olist_app.order_payments,olist_app.order_reviews,ops.debezium_heartbeat",
+
+  "publication.name": "dbz_olist",
+  "publication.autocreate.mode": "filtered",
+  "slot.name": "olist_debezium",
+  "snapshot.mode": "initial",
+
+  "decimal.handling.mode": "string",
+  "time.precision.mode": "adaptive",
+  "tombstones.on.delete": "false",
+
+  "heartbeat.interval.ms": "10000",
+  "heartbeat.action.query": "insert into ops.debezium_heartbeat (id, ts) values (1, now()) on conflict (id) do update set ts = excluded.ts",
+
+  "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "key.converter.schemas.enable": "false",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "value.converter.schemas.enable": "true",
+
+  "topic.creation.default.replication.factor": "1",
+  "topic.creation.default.partitions": "1",
+  "topic.creation.default.cleanup.policy": "delete",
+  "topic.creation.default.retention.ms": "604800000"
+}
