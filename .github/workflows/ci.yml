@@ -63,7 +63,7 @@ jobs:
         working-directory: dbt/olist
         run: dbt docs generate --target ci
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dbt-docs
           path: dbt/olist/target/
