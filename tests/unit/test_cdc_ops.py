@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -5,7 +6,7 @@ import debezium_fixture
 from register_connector import connector_config
 
 from olist.cdc import KafkaRecord, parse_event, write_events
-from olist.cdc_health import connector_problems, last_commit, quarantined_since
+from olist.cdc_health import connector_problems, last_commit, quarantined_since, write_report
 from olist.tables import TABLES
 
 RUNNING = {"connector": {"state": "RUNNING"}, "tasks": [{"id": 0, "state": "RUNNING"}]}
@@ -52,6 +53,13 @@ def test_quarantined_since_counts_only_recent_events(tmp_path):
     write_events([KafkaRecord("t", 0, 1, "{bad")], tmp_path, now - timedelta(hours=2))
     write_events([KafkaRecord("t", 0, 2, "{bad")], tmp_path, now)
     assert quarantined_since(tmp_path, now - timedelta(minutes=15)) == 1
+
+
+def test_write_report_records_problems_and_time(tmp_path):
+    checked_at = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+    write_report(tmp_path / "health" / "cdc_health.json", ["connector state is FAILED"], checked_at)
+    report = json.loads((tmp_path / "health" / "cdc_health.json").read_text())
+    assert report == {"checked_at": "2026-01-01T12:00:00+00:00", "problems": ["connector state is FAILED"]}
 
 
 def test_connector_config_fills_credentials_and_covers_every_table():

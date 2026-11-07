@@ -7,12 +7,16 @@ Fails (exit 1) when any of these holds:
   checkpoint advances every trigger even when the source is idle;
 - events landed in bronze/_quarantine during the look-back window.
 
+Every run writes its findings to REPORT (JSON), so the Airflow failure callback can
+put the reason in the Slack alert; it reads dbt's run_results.json the same way.
+
 Usage:
     python -m olist.cdc_health
     python -m olist.cdc_health --since-minutes 15 --max-stream-lag-minutes 5
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -30,6 +34,7 @@ log = logging.getLogger("cdc_health")
 
 CONNECTOR = "olist-postgres"
 CHECKPOINT = Path(os.getenv("CDC_CHECKPOINT_DIR", LAKE_ROOT / "_checkpoints" / "cdc_to_bronze"))
+REPORT = Path(os.getenv("CDC_HEALTH_REPORT", LAKE_ROOT / "_health" / "cdc_health.json"))
 
 
 def connector_problems(status: dict) -> list[str]:
@@ -96,6 +101,11 @@ def check(connect_url: str, since_minutes: int, max_stream_lag_minutes: int) -> 
     return problems
 
 
+def write_report(path: Path, problems: list[str], checked_at: datetime) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"checked_at": checked_at.isoformat(), "problems": problems}))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--connect-url", default=os.getenv("CONNECT_URL", "http://localhost:8083"))
@@ -105,6 +115,7 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     problems = check(args.connect_url, args.since_minutes, args.max_stream_lag_minutes)
+    write_report(REPORT, problems, datetime.now(UTC))
     for problem in problems:
         log.error(problem)
     if not problems:

@@ -2,7 +2,8 @@
 
 dbt checks the data, Airflow tells people:
 - notify_failure: on_failure_callback for every task; lists failed dbt tests when the
-  failing task is dbt_build.
+  failing task is dbt_build, and the problems olist.cdc_health found when it is
+  cdc_health.
 - send_dq_summary: last task of a pipeline; posts the dbt tests that ended in `warn`.
 
 Without SLACK_WEBHOOK_URL the message goes to the task log only.
@@ -11,6 +12,7 @@ Without SLACK_WEBHOOK_URL the message goes to the task log only.
 import json
 import logging
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -18,6 +20,14 @@ import requests
 log = logging.getLogger(__name__)
 
 RUN_RESULTS = Path(os.getenv("DBT_TARGET_DIR", "/opt/project/dbt/olist/target")) / "run_results.json"
+CDC_HEALTH_REPORT = Path(
+    os.getenv(
+        "CDC_HEALTH_REPORT",
+        Path(os.getenv("LAKE_ROOT", "/opt/project/data/lake")) / "_health" / "cdc_health.json",
+    )
+)
+# The callback runs seconds after cdc_health; an older report belongs to an earlier run.
+REPORT_MAX_AGE = timedelta(minutes=10)
 
 
 def post_to_slack(text: str) -> bool:
@@ -52,6 +62,17 @@ def summarize(run_results: dict, statuses: tuple[str, ...]) -> list[str]:
     return lines
 
 
+def cdc_problems(path: Path = CDC_HEALTH_REPORT, now: datetime | None = None) -> list[str]:
+    """Problems from the latest olist.cdc_health run, as Slack bullets."""
+    if not path.exists():
+        return ["• no health report found; see the task log"]
+    report = json.loads(path.read_text())
+    checked_at = datetime.fromisoformat(report["checked_at"])
+    if (now or datetime.now(UTC)) - checked_at > REPORT_MAX_AGE:
+        return [f"• last health report is from {checked_at:%H:%M} UTC; see the task log"]
+    return [f"• {problem}" for problem in report["problems"]]
+
+
 def notify_failure(context: dict) -> None:
     ti = context["ti"]
     lines = [
@@ -63,6 +84,9 @@ def notify_failure(context: dict) -> None:
         if failed:
             lines.append("Failed dbt nodes:")
             lines.extend(failed)
+    elif ti.task_id == "cdc_health":
+        lines.append("CDC problems:")
+        lines.extend(cdc_problems(CDC_HEALTH_REPORT))
     post_to_slack("\n".join(lines))
 
 
