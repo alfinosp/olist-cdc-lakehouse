@@ -1,0 +1,24 @@
+olist:
+  target: dev
+  outputs:
+    # Local / Airflow: reads Bronze Delta and can attach Postgres for reconciliation.
+    dev:
+      type: duckdb
+      path: "{{ env_var('WAREHOUSE_PATH') }}"
+      threads: 1
+      extensions: [delta, postgres]
+      settings:
+        TimeZone: UTC
+      attach:
+        - path: "host={{ env_var('PG_HOST', 'localhost') }} port={{ env_var('PG_PORT', '5432') }} dbname={{ env_var('PG_DB', 'olist') }} user={{ env_var('PG_USER', 'olist') }} password={{ env_var('PG_PASSWORD', 'olist') }}"
+          type: postgres
+          alias: pg
+          read_only: true
+    # CI: fixture Bronze only, no Postgres.
+    ci:
+      type: duckdb
+      path: "{{ env_var('WAREHOUSE_PATH') }}"
+      threads: 1
+      extensions: [delta]
+      settings:
+        TimeZone: UTC

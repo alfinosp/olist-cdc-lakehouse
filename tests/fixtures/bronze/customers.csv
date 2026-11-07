@@ -1,0 +1,4 @@
+customer_id,customer_unique_id,customer_zip_code_prefix,customer_city,customer_state,created_at,updated_at,deleted_at
+c1,u1,01310,sao paulo,SP,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,
+c2,u2,20040,rio de janeiro,RJ,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,
+c3,u1,01310,sao paulo,SP,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,

@@ -4,19 +4,23 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:      # tombol "Run workflow" manual di tab Actions
+  workflow_dispatch:
 
 permissions:
-  contents: read          # token CI cuma bisa baca repo, gak bisa nulis
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true  # push baru ke PR yang sama membatalkan run lama
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      LAKE_ROOT: ${{ github.workspace }}/data/ci/lake
+      WAREHOUSE_PATH: ${{ github.workspace }}/data/ci/ci.duckdb
+      DBT_PROFILES_DIR: ${{ github.workspace }}/dbt/olist
     steps:
       - uses: actions/checkout@v4
 
@@ -33,3 +37,21 @@ jobs:
 
       - name: Unit tests
         run: pytest
+
+      - name: Build fixture Bronze
+        run: python scripts/make_fixture_bronze.py
+
+      - name: dbt build on fixtures
+        working-directory: dbt/olist
+        run: |
+          dbt deps
+          dbt build --target ci
+
+      - name: dbt docs
+        working-directory: dbt/olist
+        run: dbt docs generate --target ci
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: dbt/olist/target/

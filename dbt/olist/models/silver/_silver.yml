@@ -1,0 +1,37 @@
+version: 2
+
+# Silver keeps one row per primary key, including rows that fail validation
+# (flagged in _dq_errors) and soft-deleted rows (flagged in _is_deleted).
+models:
+  - name: slv_customers
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_sellers
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_products
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_product_category_name_translation
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_orders
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_order_items
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_order_payments
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]
+  - name: slv_order_reviews
+    columns:
+      - name: _pk
+        data_tests: [unique, not_null]

@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Append-only Bronze Delta tables. Written by batch watermark ingestion (_source = 'batch')
+      or by the Debezium/Kafka/Spark CDC path (_source = 'cdc'); same contract either way.
+    meta:
+      external_location: "delta_scan('{{ env_var('LAKE_ROOT') }}/bronze/{name}')"
+    loaded_at_field: _ingested_at
+    freshness:
+      warn_after: {count: 30, period: minute}
+      error_after: {count: 2, period: hour}
+    tables:
+      - name: customers
+      - name: sellers
+      - name: products
+      - name: product_category_name_translation
+      - name: orders
+      - name: order_items
+      - name: order_payments
+      - name: order_reviews

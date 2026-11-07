@@ -1,0 +1,97 @@
+version: 2
+
+# Severity: error = the pipeline stops and Slack gets an alert.
+#           warn  = the pipeline continues, the run summary lists it.
+
+models:
+  - name: dim_date
+    columns:
+      - name: date_key
+        data_tests: [unique, not_null]
+
+  - name: dim_customer
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+
+  - name: dim_seller
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: dim_product
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+
+  - name: fct_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [created, approved, invoiced, processing, shipped, delivered, canceled, unavailable]
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_id
+              config:
+                severity: warn
+      - name: purchase_date_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: order_purchase_timestamp
+        data_tests:
+          - not_in_future:
+              config:
+                severity: warn
+      - name: payment_value
+        data_tests: [non_negative]
+
+  - name: fct_order_items
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, order_item_id]
+    columns:
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_id
+              config:
+                severity: warn
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_seller')
+                field: seller_id
+              config:
+                severity: warn
+      - name: price
+        data_tests: [non_negative]
+      - name: freight_value
+        data_tests: [non_negative]
+
+  - name: fct_payments
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, payment_sequential]
+    columns:
+      - name: payment_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card, not_defined]
+      - name: payment_value
+        data_tests: [non_negative]

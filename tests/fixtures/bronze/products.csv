@@ -1,0 +1,4 @@
+product_id,product_category_name,product_name_lenght,product_description_lenght,product_photos_qty,product_weight_g,product_length_cm,product_height_cm,product_width_cm,created_at,updated_at,deleted_at
+p1,beleza_saude,40,287,1,225,16,10,14,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,
+p2,informatica_acessorios,44,276,1,1000,30,18,20,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,
+p3,pc_gamer,52,1210,4,3500,45,30,40,2026-01-01 00:00:00+00,2026-01-01 00:00:00+00,
