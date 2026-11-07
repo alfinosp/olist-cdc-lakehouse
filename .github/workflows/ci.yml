@@ -38,14 +38,26 @@ jobs:
       - name: Unit tests
         run: pytest
 
-      - name: Build fixture Bronze
-        run: python scripts/make_fixture_bronze.py
+      - name: Build fixture Bronze (batch path)
+        run: python scripts/make_fixture_bronze.py --via batch
 
-      - name: dbt build on fixtures
+      - name: dbt build on fixtures (batch path)
         working-directory: dbt/olist
         run: |
           dbt deps
           dbt build --target ci
+
+      # Same rows, encoded as Debezium events and decoded by the streaming job's code.
+      # The dbt project must pass unchanged.
+      - name: Build fixture Bronze (CDC path)
+        run: python scripts/make_fixture_bronze.py --via cdc
+
+      - name: dbt build on fixtures (CDC path)
+        working-directory: dbt/olist
+        env:
+          LAKE_ROOT: ${{ github.workspace }}/data/ci/lake-cdc
+          WAREHOUSE_PATH: ${{ github.workspace }}/data/ci/ci-cdc.duckdb
+        run: dbt build --target ci
 
       - name: dbt docs
         working-directory: dbt/olist

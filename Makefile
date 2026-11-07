@@ -12,11 +12,14 @@ export LAKE_ROOT        ?= $(CURDIR)/data/lake
 export WAREHOUSE_PATH   ?= $(CURDIR)/data/warehouse/olist.duckdb
 export DBT_PROFILES_DIR ?= $(CURDIR)/dbt/olist
 
+COMPOSE_CDC := docker compose -f docker-compose.yml -f docker-compose.cdc.yml
+
 .PHONY: help venv up down reset download seed simulate ingest dbt-deps dbt-debug dbt-build dbt-docs \
-        test lint ci-local airflow-up airflow-down sim-up sim-down
+        test lint ci-local airflow-up airflow-down sim-up sim-down \
+        cdc-up cdc-register cdc-status cdc-logs cdc-down cdc-reset
 
 help:  ## List targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 venv:  ## Create .venv and install the project with dev tools
 	python3 -m venv $(VENV)
@@ -26,11 +29,11 @@ venv:  ## Create .venv and install the project with dev tools
 up:  ## Start Postgres
 	docker compose up -d postgres
 
-down:  ## Stop every container (data is kept)
-	docker compose --profile sim down
+down:  ## Stop every container; data, Kafka topics and the replication slot are kept
+	$(COMPOSE_CDC) --profile sim stop
 
-reset:  ## DELETE the Postgres volume and the local lake/warehouse
-	docker compose --profile sim down -v
+reset:  ## DELETE the Postgres volume, Kafka, and the local lake/warehouse
+	$(COMPOSE_CDC) --profile sim down -v
 	rm -rf data/lake data/warehouse data/ci
 
 download:  ## Download the Olist CSV files from Kaggle into data/raw
@@ -68,13 +71,17 @@ lint:  ## Ruff lint
 ci-local:  ## Run what CI runs, on fixture data (does not touch data/lake)
 	$(VENV)/bin/ruff check .
 	$(PY) -m pytest
-	$(PY) scripts/make_fixture_bronze.py
 	mkdir -p data/ci
-	cd dbt/olist && $(DBT) deps --quiet && LAKE_ROOT=$(CURDIR)/data/ci/lake WAREHOUSE_PATH=$(CURDIR)/data/ci/ci.duckdb \
-		$(DBT) build --target ci
+	cd dbt/olist && $(DBT) deps --quiet
+	for via in batch cdc; do \
+		lake=$(CURDIR)/data/ci/lake$$([ $$via = cdc ] && echo -cdc); \
+		$(PY) scripts/make_fixture_bronze.py --via $$via && \
+		(cd dbt/olist && LAKE_ROOT=$$lake WAREHOUSE_PATH=$(CURDIR)/data/ci/$$via.duckdb $(DBT) build --target ci) \
+		|| exit 1; \
+	done
 
-airflow-up:  ## Build and start Airflow on http://localhost:8080
-	docker compose up -d --build airflow
+airflow-up:  ## Build and start Airflow on http://localhost:8080 (batch mode)
+	INGESTION_MODE=batch docker compose up -d --build airflow
 
 airflow-down:  ## Stop Airflow
 	docker compose stop airflow
@@ -84,3 +91,28 @@ sim-up:  ## Start the simulator container (SIM_BAD_RATE=0.2 make sim-up for bad 
 
 sim-down:  ## Stop the simulator container
 	docker compose --profile sim stop simulator
+
+cdc-up:  ## Start Kafka, Debezium, Spark and Airflow in CDC mode, then register the connector
+	INGESTION_MODE=cdc $(COMPOSE_CDC) up -d --build postgres kafka connect spark airflow
+	$(PY) scripts/register_connector.py --wait 180
+
+cdc-register:  ## (Re)apply the Debezium connector config; safe to repeat
+	$(PY) scripts/register_connector.py
+
+cdc-status:  ## Connector state and CDC topics
+	@curl -fs http://localhost:8083/connectors/olist-postgres/status | $(PY) -m json.tool
+	@$(COMPOSE_CDC) exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list \
+		| grep '^olist\.'
+
+cdc-logs:  ## Follow the Spark streaming job
+	$(COMPOSE_CDC) logs -f spark
+
+cdc-down:  ## Stop the CDC containers; the replication slot and Kafka topics are kept
+	$(COMPOSE_CDC) stop kafka connect spark
+
+cdc-reset:  ## DELETE the connector, replication slot, Kafka topics and Spark checkpoint
+	-curl -fs -X DELETE http://localhost:8083/connectors/olist-postgres
+	$(COMPOSE_CDC) rm -sf kafka connect spark
+	docker compose exec -T postgres psql -U $${PG_USER:-olist} -d $${PG_DB:-olist} -c \
+		"select pg_drop_replication_slot(slot_name) from pg_replication_slots where slot_name = 'olist_debezium'"
+	rm -rf data/lake/_checkpoints/cdc_to_bronze

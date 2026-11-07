@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /infra/airflow
+    schedule:
+      interval: monthly
+    groups:
+      airflow-image:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /infra/airflow
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
